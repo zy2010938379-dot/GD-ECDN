@@ -1,0 +1,4 @@
+coredns-api/build/
+EdgeAPI/edge-api
+EdgeAPI/cmd/edge-api/edge-api
+EdgeNode/build/edge-node

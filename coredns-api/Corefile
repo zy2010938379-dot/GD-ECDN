@@ -1,0 +1,19 @@
+.:8053 {
+    # CoreDNS plugins
+    errors
+    health
+
+    # Enable API plugin
+    api {
+        address :18080
+        # Optional: enable authentication
+        # apikey "your-secret-key"
+        zone_file ./zones.db
+    }
+
+    # File-based zone storage
+    file ./zones.db
+
+    cache
+    forward . 8.8.8.8 1.1.1.1
+}

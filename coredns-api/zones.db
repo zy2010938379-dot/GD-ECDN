@@ -1,0 +1,131 @@
+; Example zone file for CoreDNS API plugin
+
+$ORIGIN example.com.
+$TTL 3600
+
+@       IN      SOA     ns1.example.com. admin.example.com. (
+                        2024020501 ; serial
+                        7200       ; refresh
+                        3600       ; retry
+                        1209600    ; expire
+                        3600       ; minimum
+                        )
+
+
+ns1     IN      A       192.168.1.10
+ns2     IN      A       192.168.1.11
+
+www     IN      A       192.168.1.100
+api     IN      A       192.168.1.101
+mail    IN      A       192.168.1.102
+
+; MX record
+        IN      MX      10 mail.example.com.
+
+; CNAME records
+ftp     IN      CNAME   www.example.com.
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+1114f8ba	3600	IN	CNAME	g47d8fd.cdn.example.com.
+test1	3600	IN	CNAME	g47d8fd.cdn.example.com.
+test	3600	IN	CNAME	g47d8fd.cdn.example.com.
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+g47d8fd.cdn	3600	IN	A	127.0.0.1
+node1.cdn	3600	IN	A	127.0.0.1
+test	3600	IN	CNAME	node1.cdn.example.com.
+node1.cdn	3600	IN	A	127.0.0.1
+node1.cdn	3600	IN	A	127.0.0.1
+node1.cdn	3600	IN	A	127.0.0.1
+node1.cdn	3600	IN	A	192.168.49.101
+node1.cdn	3600	IN	A	127.0.0.1
+node1.cdn	3600	IN	A	192.168.49.101
+node1.cdn	3600	IN	A	127.0.0.1
+test	3600	IN	CNAME	node1.cdn.example.com.
+node1.cdn	3600	IN	A	192.168.49.101
+node1.cdn	3600	IN	A	127.0.0.1
+node1.cdn	3600	IN	A	192.168.49.101
+node1.cdn	3600	IN	A	127.0.0.1
+
+$ORIGIN test.org.
+$TTL 3600
+
+@       IN      SOA     ns1.test.org. admin.test.org. (
+                        2024020501 ; serial
+                        7200       ; refresh
+                        3600       ; retry
+                        1209600    ; expire
+                        3600       ; minimum
+                        )
+
+        IN      NS      ns1.test.org.
+
+www     IN      A       192.168.2.100
+; mydomain.com zone
+$ORIGIN mydomain.com.
+$TTL 3600
+
+@       IN      SOA     ns1.mydomain.com. admin.mydomain.com. (
+                        2024010101 ; serial
+                        3600       ; refresh
+                        1800       ; retry
+                        604800     ; expire
+                        86400 )    ; minimum
+
+
+@	3600	IN	A	192.168.3.100
+@	3600	IN	A	192.168.3.100
+test	3600	IN	A	192.168.1.100
+
+; newdomain.com zone
+$ORIGIN newdomain.com.
+$TTL 3600
+
+@       IN      SOA     ns1.newdomain.com. admin.newdomain.com. (
+					2024010101 ; serial
+					3600       ; refresh
+					1800       ; retry
+					604800     ; expire
+					86400 )    ; minimum
+
+@       IN      NS      ns1.newdomain.com.
+@       IN      NS      ns2.newdomain.com.
+www	3600	IN	A	192.168.1.200
+
+; testinterface.com zone
+$ORIGIN testinterface.com.
+$TTL 3600
+
+@       IN      SOA     ns1.testinterface.com. admin.testinterface.com. (
+					2024010101 ; serial
+					3600       ; refresh
+					1800       ; retry
+					604800     ; expire
+					86400 )    ; minimum
+
+@       IN      NS      ns1.testinterface.com.
+@       IN      NS      ns2.testinterface.com.
+@	3600	IN	A	192.168.1.100

@@ -1,0 +1,5 @@
+EdgeAPI/edge-api filter=lfs diff=lfs merge=lfs -text
+EdgeAPI/cmd/edge-api/edge-api filter=lfs diff=lfs merge=lfs -text
+EdgeNode/build/edge-node filter=lfs diff=lfs merge=lfs -text
+coredns-api/build/coredns-with-api-centos filter=lfs diff=lfs merge=lfs -text
+coredns-api/build/coredns-with-api filter=lfs diff=lfs merge=lfs -text

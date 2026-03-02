@@ -1,0 +1,23 @@
+anzhan123
+
+1f0f2dab528e7a702681ef16bbcc47e8
+
+
+
+
+go run -tags community cmd/edge-admin/main.go
+go run -tags community cmd/edge-api/main.go
+go run -tags community cmd/edge-node/main.go
+
+./build.sh linux amd64 打包  disk 下安装包
+先安装api  admin  node 
+
+
+cd coredns-api/coredns && go build -o ../build/coredns-with-api
+cd coredns-api && ./build/coredns-with-api -conf Corefile &
+
+cd /home/root-gjk/project/goedge/EdgeNode && go build -tags community -o build/edge-node cmd/edge-node/main.go
+
+
+
+cd coredns-api/coredns && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags='-extldflags "-static" -s -w' -tags netgo -o ../build/coredns-with-api-centos coredns.go

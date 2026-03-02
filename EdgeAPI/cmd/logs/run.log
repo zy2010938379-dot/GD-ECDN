@@ -1,0 +1,3 @@
+2026/02/05 17:43:20 [API_NODE]start api node, pid: 83306
+2026/02/05 17:43:20 [API_NODE]listening sock ...
+2026/02/05 17:43:20 [API_NODE]start local sock failed: error: the process is already running, pid: 46741

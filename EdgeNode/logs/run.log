@@ -1,0 +1,100 @@
+2026/02/05 15:47:14 [NODE]initializing ip library ...
+2026/02/05 15:47:14 [NODE]init config ...
+2026/02/05 15:47:23 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:47:24 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:47:33 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:47:34 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:47:43 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:47:44 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:47:53 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:47:54 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:48:03 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:48:04 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:48:13 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:48:14 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:48:14 [TASK][SYNC_API_NODES_TASK]no config file 'api_node.yaml' found
+2026/02/05 15:48:23 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:48:24 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:48:33 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:48:34 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:48:43 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:48:44 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:48:53 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:48:54 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:49:03 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:49:04 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:49:13 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:49:14 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:49:14 [TASK][SYNC_API_NODES_TASK]no config file 'api_node.yaml' found
+2026/02/05 15:49:23 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:49:24 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:49:33 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:49:34 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:49:43 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:49:44 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:49:53 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:49:54 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:50:03 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:50:04 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:50:13 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:50:14 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:50:14 [FIREWALL]nftables is ready
+2026/02/05 15:50:14 [FIREWALL]change DDoS protection config
+2026/02/05 15:50:14 [TASK][SYNC_API_NODES_TASK]no config file 'api_node.yaml' found
+2026/02/05 15:50:23 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:50:24 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:50:33 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:50:34 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:50:43 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:50:44 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:50:53 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:50:54 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:51:03 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:51:04 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:51:13 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:51:14 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:51:14 [TASK][SYNC_API_NODES_TASK]no config file 'api_node.yaml' found
+2026/02/05 15:51:23 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:51:24 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/05 15:51:33 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/05 15:51:34 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:56:36 [NODE]initializing ip library ...
+2026/02/06 08:56:37 [NODE]init config ...
+2026/02/06 08:56:46 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:56:46 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:56:56 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:56:56 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:57:06 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:57:06 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:57:16 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:57:16 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:57:26 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:57:27 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:57:36 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:57:37 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:57:37 [TASK][SYNC_API_NODES_TASK]no config file 'api_node.yaml' found
+2026/02/06 08:57:46 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:57:47 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:57:56 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:57:57 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:58:06 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:58:07 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:58:16 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:58:17 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:58:26 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:58:27 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:58:36 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:58:37 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:58:37 [TASK][SYNC_API_NODES_TASK]no config file 'api_node.yaml' found
+2026/02/06 08:58:46 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:58:47 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:58:50 [CACHE]quiting cache manager
+2026/02/06 08:59:20 [NODE]initializing ip library ...
+2026/02/06 08:59:21 [NODE]init config ...
+2026/02/06 08:59:30 [HTTP_CACHE_TASK_MANAGER]execute task failed: no config file 'api_node.yaml' found
+2026/02/06 08:59:30 [NODE]can not find config file 'configs/api_node.yaml'
+2026/02/06 08:59:36 [CACHE]quiting cache manager
+2026/02/06 09:08:25 [NODE]initializing ip library ...
+2026/02/06 09:08:26 [NODE]init config ...
+2026/02/06 09:08:35 [NODE]read config from rpc failed: rpc error: code = Unavailable desc = connection error: desc = "error reading server preface: http2: frame too large"
+2026/02/06 09:08:45 [NODE]read config from rpc failed: rpc error: code = Unavailable desc = connection error: desc = "error reading server preface: http2: frame too large"
