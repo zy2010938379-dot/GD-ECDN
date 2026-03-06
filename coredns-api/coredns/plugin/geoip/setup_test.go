@@ -49,23 +49,28 @@ func TestGeoIPParse(t *testing.T) {
 		config         string
 		expectedErr    string
 		expectedDBType int
+		expectDB       bool
 	}{
 		// Valid - City database
-		{false, fmt.Sprintf("%s %s\n", pluginName, cityDBPath), "", city},
-		{false, fmt.Sprintf("%s %s { edns-subnet }", pluginName, cityDBPath), "", city},
+		{false, fmt.Sprintf("%s %s\n", pluginName, cityDBPath), "", city, true},
+		{false, fmt.Sprintf("%s %s {\n\tedns-subnet\n}", pluginName, cityDBPath), "", city, true},
+		{false, fmt.Sprintf("%s %s {\n\tedns-subnet\n\tecs-fallback disabled\n}", pluginName, cityDBPath), "", city, true},
 		// Valid - ASN database
-		{false, fmt.Sprintf("%s %s\n", pluginName, asnDBPath), "", asn},
-		{false, fmt.Sprintf("%s %s { edns-subnet }", pluginName, asnDBPath), "", asn},
+		{false, fmt.Sprintf("%s %s\n", pluginName, asnDBPath), "", asn, true},
+		{false, fmt.Sprintf("%s %s {\n\tedns-subnet\n}", pluginName, asnDBPath), "", asn, true},
+		// Valid - GoEdge city library only
+		{false, fmt.Sprintf("%s {\n\tgoedge-city\n}\n", pluginName), "", 0, false},
 
 		// Invalid
-		{true, pluginName, "Wrong argument count", 0},
-		{true, fmt.Sprintf("%s %s {\n\tlanguages en fr es zh-CN\n}\n", pluginName, cityDBPath), "unknown property \"languages\"", 0},
-		{true, fmt.Sprintf("%s %s\n%s %s\n", pluginName, cityDBPath, pluginName, cityDBPath), "configuring multiple databases is not supported", 0},
-		{true, fmt.Sprintf("%s 1 2 3", pluginName), "Wrong argument count", 0},
-		{true, fmt.Sprintf("%s { }", pluginName), "Error during parsing", 0},
-		{true, fmt.Sprintf("%s /dbpath { city }", pluginName), "unknown property \"city\"", 0},
-		{true, fmt.Sprintf("%s /invalidPath\n", pluginName), "failed to open database file: open /invalidPath: no such file or directory", 0},
-		{true, fmt.Sprintf("%s %s\n", pluginName, unknownDBPath), "reader does not support the \"UnknownDbType\" database type", 0},
+		{true, pluginName, "Wrong argument count", 0, false},
+		{true, fmt.Sprintf("%s %s {\n\tlanguages en fr es zh-CN\n}\n", pluginName, cityDBPath), "unknown property \"languages\"", 0, false},
+		{true, fmt.Sprintf("%s %s\n%s %s\n", pluginName, cityDBPath, pluginName, cityDBPath), "configuring multiple databases is not supported", 0, false},
+		{true, fmt.Sprintf("%s 1 2 3", pluginName), "Wrong argument count", 0, false},
+		{true, fmt.Sprintf("%s { }", pluginName), "Wrong argument count", 0, false},
+		{true, fmt.Sprintf("%s /dbpath { city }", pluginName), "unknown property \"city\"", 0, false},
+		{true, fmt.Sprintf("%s /invalidPath\n", pluginName), "failed to open database file: open /invalidPath: no such file or directory", 0, false},
+		{true, fmt.Sprintf("%s %s\n", pluginName, unknownDBPath), "reader does not support the \"UnknownDbType\" database type", 0, false},
+		{true, fmt.Sprintf("%s %s {\n\tecs-fallback nope\n}", pluginName, cityDBPath), "unknown ecs-fallback policy", 0, false},
 	}
 
 	for i, test := range tests {
@@ -87,11 +92,14 @@ func TestGeoIPParse(t *testing.T) {
 			continue
 		}
 
-		if geoIP.db.Reader == nil {
-			t.Errorf("Test %d: after parsing database reader should be initialized", i)
+		if test.expectDB && geoIP.db.Reader == nil {
+			t.Errorf("Test %d: expected database reader to be initialized", i)
+		}
+		if !test.expectDB && geoIP.db.Reader != nil {
+			t.Errorf("Test %d: expected database reader to be nil", i)
 		}
 
-		if geoIP.db.provides&test.expectedDBType == 0 {
+		if test.expectedDBType > 0 && geoIP.db.provides&test.expectedDBType == 0 {
 			t.Errorf("Test %d: expected db type %d not found, database file provides %d", i, test.expectedDBType, geoIP.db.provides)
 		}
 	}

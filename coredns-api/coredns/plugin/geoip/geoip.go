@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/netip"
 	"path/filepath"
+	"sync"
 
+	"github.com/TeaOSLab/EdgeCommon/pkg/iplibrary"
 	"github.com/coredns/coredns/plugin"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/request"
@@ -20,9 +22,11 @@ var log = clog.NewWithPlugin(pluginName)
 // GeoIP is a plugin that adds geo location and network data to the request context by looking up
 // an MMDB format database, and which data can be later consumed by other middlewares.
 type GeoIP struct {
-	Next  plugin.Handler
-	db    db
-	edns0 bool
+	Next              plugin.Handler
+	db                db
+	edns0             bool
+	ecsFallbackPolicy ECSFallbackPolicy
+	goedgeCity        bool
 }
 
 type db struct {
@@ -39,37 +43,59 @@ const (
 
 var probingIP = netip.MustParseAddr("127.0.0.1")
 
-func newGeoIP(dbPath string, edns0 bool) (*GeoIP, error) {
-	reader, err := geoip2.Open(dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database file: %v", err)
-	}
-	db := db{Reader: reader}
-	schemas := []struct {
-		provides int
-		name     string
-		validate func() error
-	}{
-		{name: "city", provides: city, validate: func() error { _, err := reader.City(probingIP); return err }},
-		{name: "asn", provides: asn, validate: func() error { _, err := reader.ASN(probingIP); return err }},
-	}
-	// Query the database to figure out the database type.
-	for _, schema := range schemas {
-		if err := schema.validate(); err != nil {
-			// If we get an InvalidMethodError then we know this database does not provide that schema.
-			if _, ok := err.(geoip2.InvalidMethodError); !ok {
-				return nil, fmt.Errorf("unexpected failure looking up database %q schema %q: %v", filepath.Base(dbPath), schema.name, err)
+var (
+	initGoEdgeLibraryOnce sync.Once
+	initGoEdgeLibraryErr  error
+)
+
+func newGeoIP(dbPath string, edns0 bool, fallbackPolicy ECSFallbackPolicy, goedgeCity bool) (*GeoIP, error) {
+	db := db{}
+	if dbPath != "" {
+		reader, err := geoip2.Open(dbPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open database file: %v", err)
+		}
+		db.Reader = reader
+		schemas := []struct {
+			provides int
+			name     string
+			validate func() error
+		}{
+			{name: "city", provides: city, validate: func() error { _, err := reader.City(probingIP); return err }},
+			{name: "asn", provides: asn, validate: func() error { _, err := reader.ASN(probingIP); return err }},
+		}
+		// Query the database to figure out the database type.
+		for _, schema := range schemas {
+			if err := schema.validate(); err != nil {
+				// If we get an InvalidMethodError then we know this database does not provide that schema.
+				if _, ok := err.(geoip2.InvalidMethodError); !ok {
+					return nil, fmt.Errorf("unexpected failure looking up database %q schema %q: %v", filepath.Base(dbPath), schema.name, err)
+				}
+			} else {
+				db.provides |= schema.provides
 			}
-		} else {
-			db.provides |= schema.provides
 		}
 	}
 
-	if db.provides == 0 {
+	if db.provides == 0 && !goedgeCity {
 		return nil, fmt.Errorf("database does not provide any supported schema (city, asn)")
 	}
 
-	return &GeoIP{db: db, edns0: edns0}, nil
+	if goedgeCity {
+		initGoEdgeLibraryOnce.Do(func() {
+			initGoEdgeLibraryErr = iplibrary.InitDefault()
+		})
+		if initGoEdgeLibraryErr != nil {
+			return nil, fmt.Errorf("failed to initialize goedge ip library: %w", initGoEdgeLibraryErr)
+		}
+	}
+
+	return &GeoIP{
+		db:                db,
+		edns0:             edns0,
+		ecsFallbackPolicy: fallbackPolicy,
+		goedgeCity:        goedgeCity,
+	}, nil
 }
 
 // ServeDNS implements the plugin.Handler interface.
@@ -80,34 +106,22 @@ func (g GeoIP) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (
 // Metadata implements the metadata.Provider Interface in the metadata plugin, and is used to store
 // the data associated with the source IP of every request.
 func (g GeoIP) Metadata(ctx context.Context, state request.Request) context.Context {
-	srcIP, err := netip.ParseAddr(state.IP())
-	if err != nil {
-		log.Debugf("Failed to parse source IP %q: %v", state.IP(), err)
+	srcIP, source, fallbackReason, ok := g.resolveEffectiveClientIP(state)
+	if !ok {
 		return ctx
 	}
 
-	if g.edns0 {
-		if o := state.Req.IsEdns0(); o != nil {
-			for _, s := range o.Option {
-				if e, ok := s.(*dns.EDNS0_SUBNET); ok {
-					// e.Address is still a net.IP type
-					if addr, ok := netip.AddrFromSlice(e.Address); ok {
-						srcIP = addr
-					} else {
-						log.Debugf("Failed to parse EDNS0 subnet address %v", e.Address)
-					}
-					break
-				}
-			}
-		}
-	}
+	g.setClientIPMetadata(ctx, srcIP.String(), source, fallbackReason)
+	g.observeClientIPSource(source, fallbackReason)
 
 	if g.db.provides&city != 0 {
 		data, err := g.db.City(srcIP)
 		if err != nil {
 			log.Debugf("Setting up city metadata failed due to database lookup error: %v", err)
+			g.observeCityLookup(false)
 		} else {
 			g.setCityMetadata(ctx, data)
+			g.observeCityLookup(data.City.Names.English != "")
 		}
 	}
 	if g.db.provides&asn != 0 {
@@ -118,6 +132,13 @@ func (g GeoIP) Metadata(ctx context.Context, state request.Request) context.Cont
 			g.setASNMetadata(ctx, data)
 		}
 	}
+
+	if g.goedgeCity {
+		result := g.lookupGoEdgeCity(srcIP, source, fallbackReason)
+		g.setGoEdgeCityMetadata(ctx, result)
+		g.observeGoEdgeCityLookup(result)
+	}
+
 	return ctx
 }
 

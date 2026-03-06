@@ -81,11 +81,18 @@ or
 ```text
 geoip [DBFILE] {
     [edns-subnet]
+    [ecs-fallback resolver-ip|disabled]
+    [goedge-city]
 }
 ```
 
 * **DBFILE** the `mmdb` database file path. We recommend updating your `mmdb` database periodically for more accurate results.
+  If `goedge-city` is enabled, `DBFILE` becomes optional.
 * `edns-subnet`: Optional. Use [EDNS0 subnet](https://en.wikipedia.org/wiki/EDNS_Client_Subnet) (if present) for Geo IP instead of the source IP of the DNS request. This helps identifying the closest source IP address through intermediary DNS resolvers, and it also makes GeoIP testing easy: `dig +subnet=1.2.3.4 @dns-server.example.com www.geo-aware.com`.
+* `ecs-fallback`: Optional. ECS unavailable/invalid时的回退策略。
+  * `resolver-ip` (default): 使用递归解析器来源 IP 回退；
+  * `disabled`: 不回退，直接跳过 geoip 元数据填充。
+* `goedge-city`: Optional. 使用 GoEdge 内置 IP 库执行 `IP -> country/province/city/provider` 映射，并输出 `geoip/goedge/*` 元数据。
 
   **NOTE:** due to security reasons, recursive DNS resolvers may mask a few bits off of the clients' IP address, which can cause inaccuracies in GeoIP resolution.
 
@@ -99,8 +106,22 @@ The following configuration configures the `City` database, and looks up geoloca
 . {
     geoip /opt/geoip2/db/GeoLite2-City.mmdb {
       edns-subnet
+      ecs-fallback resolver-ip
     }
     metadata # Note that metadata plugin must be enabled as well.
+}
+```
+
+仅启用 GoEdge 城市映射：
+
+```txt
+. {
+    geoip {
+      edns-subnet
+      ecs-fallback resolver-ip
+      goedge-city
+    }
+    metadata
 }
 ```
 
@@ -125,6 +146,53 @@ example.com {
 }
 ```
 
+GoEdge 城市元数据也可用于 view 选择（城市优先，默认块即回退）：
+
+```txt
+example.com {
+    view guangzhou {
+      expr metadata('geoip/goedge/city/name') == '广州市'
+    }
+    geoip {
+      edns-subnet
+      ecs-fallback resolver-ip
+      goedge-city
+    }
+    metadata
+    file example.com.gz-db
+}
+
+example.com {
+    file example.com.default-db
+}
+```
+
+## Production Rollout Playbook (ECS City Routing)
+
+建议采用分阶段灰度发布，并绑定明确告警阈值：
+
+1. **Baseline（开关关闭）**: 先观察 24h 基线（延迟、错误率、命中率）。
+2. **Canary（小流量）**: 仅对少量域名或线路开启 `goedge-city`（建议 1%~5%）。
+3. **Batch（分批放量）**: 逐步扩大到 10% -> 30% -> 60%。
+4. **Full（全量）**: 指标稳定后全量开启。
+
+推荐观测指标与阈值（可按业务调整）：
+
+- `coredns_geoip_effective_client_ip_source_total{source="ecs"}`:
+  ECS 来源占比相对基线下降 >20% 持续 10 分钟，告警。
+- `coredns_geoip_goedge_city_lookup_total{result="hit"}`:
+  城市命中率相对基线下降 >15% 持续 10 分钟，告警。
+- DNS 解析延迟（p95）:
+  相对基线上升 >20ms 或 >20%，告警。
+- SERVFAIL 比例:
+  超过 0.5% 或高于基线 2 倍，立即回滚。
+
+回滚策略：
+
+1. 立即关闭 `goedge-city`（保留 `geoip` 基础能力）。
+2. 如仍异常，关闭 `edns-subnet` 路径，恢复原有来源 IP 路由。
+3. 保留问题时段日志与指标，定位 `ecs_missing/ecs_malformed` 与 `city miss` 的主因后再重试灰度。
+
 ## Metadata Labels
 
 A limited set of fields will be exported as labels, all values are stored using strings **regardless of their underlying value type**, and therefore you may have to convert it back to its original type, note that numeric values are always represented in base 10.
@@ -144,6 +212,12 @@ A limited set of fields will be exported as labels, all values are stored using 
 | `geoip/subdivisions/code`            | `string`  | `ENG,TWH`        | Comma separated [ISO 3166-2](https://en.wikipedia.org/wiki/ISO_3166-2) subdivision(region) codes, e.g. first level (province), second level (state).
 | `geoip/asn/number`                   | `uint`    | `396982`         | The autonomous system number.
 | `geoip/asn/org`                      | `string`  | `GOOGLE-CLOUD-PLATFORM` | The autonomous system organization.
+| `geoip/client/ip`                    | `string`  | `61.142.56.193`  | Effective client IP used for lookup.
+| `geoip/client/ip_source`             | `string`  | `ecs`            | Effective client IP source (`ecs` or `fallback`).
+| `geoip/client/ip_fallback_reason`    | `string`  | `ecs_missing`    | Fallback reason when source is `fallback`.
+| `geoip/goedge/city/id`               | `int64`   | `440100`         | GoEdge city ID.
+| `geoip/goedge/city/name`             | `string`  | `广州市`          | GoEdge city name.
+| `geoip/goedge/city/hit`              | `bool`    | `true`           | Whether GoEdge city mapping is a hit.
 
 ## Continent Codes
 

@@ -46,7 +46,7 @@ func TestMetadata(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s/%s", tc.label, "direct"), func(t *testing.T) {
-			geoIP, err := newGeoIP(tc.dbPath, false)
+			geoIP, err := newGeoIP(tc.dbPath, false, ECSFallbackPolicyResolverIP, false)
 			if err != nil {
 				t.Fatalf("unable to create geoIP plugin: %v", err)
 			}
@@ -58,7 +58,7 @@ func TestMetadata(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("%s/%s", tc.label, "subnet"), func(t *testing.T) {
-			geoIP, err := newGeoIP(tc.dbPath, true)
+			geoIP, err := newGeoIP(tc.dbPath, true, ECSFallbackPolicyResolverIP, false)
 			if err != nil {
 				t.Fatalf("unable to create geoIP plugin: %v", err)
 			}
@@ -86,7 +86,7 @@ func TestMetadataUnknownIP(t *testing.T) {
 	// zero values (ASN="0", org="").
 	unknownIPAddr := "203.0.113.1" // TEST-NET-3, not explicitly in our fixture.
 
-	geoIP, err := newGeoIP(asnDBPath, false)
+	geoIP, err := newGeoIP(asnDBPath, false, ECSFallbackPolicyResolverIP, false)
 	if err != nil {
 		t.Fatalf("unable to create geoIP plugin: %v", err)
 	}
@@ -117,6 +117,118 @@ func TestMetadataUnknownIP(t *testing.T) {
 	}
 	if fn() != "" {
 		t.Errorf("expected geoip/asn/org to be empty for unknown IP, got %q", fn())
+	}
+}
+
+func TestClientIPMetadataSource(t *testing.T) {
+	geoIP, err := newGeoIP(cityDBPath, true, ECSFallbackPolicyResolverIP, false)
+	if err != nil {
+		t.Fatalf("unable to create geoIP plugin: %v", err)
+	}
+
+	state := request.Request{
+		Req: new(dns.Msg),
+		W:   &test.ResponseWriter{RemoteIP: "10.240.0.1"},
+	}
+	state.Req.SetEdns0(4096, false)
+	if opt := state.Req.IsEdns0(); opt != nil {
+		opt.Option = append(opt.Option, &dns.EDNS0_SUBNET{
+			Code:          dns.EDNS0SUBNET,
+			Family:        1,
+			SourceNetmask: 32,
+			Address:       net.ParseIP("61.142.56.193"),
+		})
+	}
+
+	ctx := metadata.ContextWithMetadata(context.Background())
+	geoIP.Metadata(ctx, state)
+
+	get := metadata.ValueFunc(ctx, "geoip/client/ip_source")
+	if get == nil || get() != request.ClientIPSourceECS {
+		t.Fatalf("expected source metadata %q, got %v", request.ClientIPSourceECS, get)
+	}
+}
+
+func TestClientIPMetadataFallbackReason(t *testing.T) {
+	geoIP, err := newGeoIP(cityDBPath, true, ECSFallbackPolicyResolverIP, false)
+	if err != nil {
+		t.Fatalf("unable to create geoIP plugin: %v", err)
+	}
+
+	state := request.Request{
+		Req: new(dns.Msg),
+		W:   &test.ResponseWriter{RemoteIP: "10.240.0.1"},
+	}
+	state.Req.SetEdns0(4096, false)
+	if opt := state.Req.IsEdns0(); opt != nil {
+		opt.Option = append(opt.Option, &dns.EDNS0_SUBNET{
+			Code:          dns.EDNS0SUBNET,
+			Family:        1,
+			SourceNetmask: 40,
+			Address:       net.ParseIP("61.142.56.193"),
+		})
+	}
+
+	ctx := metadata.ContextWithMetadata(context.Background())
+	geoIP.Metadata(ctx, state)
+
+	getReason := metadata.ValueFunc(ctx, "geoip/client/ip_fallback_reason")
+	if getReason == nil || getReason() != request.ClientIPFallbackECSMalformed {
+		t.Fatalf("expected fallback reason %q, got %v", request.ClientIPFallbackECSMalformed, getReason)
+	}
+}
+
+func TestGoEdgeCityMetadata(t *testing.T) {
+	geoIP, err := newGeoIP("", true, ECSFallbackPolicyResolverIP, true)
+	if err != nil {
+		t.Fatalf("unable to create geoIP plugin: %v", err)
+	}
+
+	state := request.Request{
+		Req: new(dns.Msg),
+		W:   &test.ResponseWriter{RemoteIP: "127.0.0.1"},
+	}
+	state.Req.SetEdns0(4096, false)
+	if opt := state.Req.IsEdns0(); opt != nil {
+		opt.Option = append(opt.Option, &dns.EDNS0_SUBNET{
+			Code:          dns.EDNS0SUBNET,
+			Family:        1,
+			SourceNetmask: 32,
+			Address:       net.ParseIP("61.142.56.193"),
+		})
+	}
+
+	ctx := metadata.ContextWithMetadata(context.Background())
+	geoIP.Metadata(ctx, state)
+
+	getCityName := metadata.ValueFunc(ctx, "geoip/goedge/city/name")
+	if getCityName == nil || getCityName() == "" {
+		t.Fatalf("expected goedge city metadata to be present")
+	}
+
+	getHit := metadata.ValueFunc(ctx, "geoip/goedge/city/hit")
+	if getHit == nil || getHit() != "true" {
+		t.Fatalf("expected goedge city hit metadata true")
+	}
+}
+
+func TestMetadataFallbackPolicyDisabled(t *testing.T) {
+	geoIP, err := newGeoIP(cityDBPath, true, ECSFallbackPolicyDisabled, false)
+	if err != nil {
+		t.Fatalf("unable to create geoIP plugin: %v", err)
+	}
+
+	state := request.Request{
+		Req: new(dns.Msg),
+		W:   &test.ResponseWriter{RemoteIP: "81.2.69.142"},
+	}
+
+	ctx := metadata.ContextWithMetadata(context.Background())
+	geoIP.Metadata(ctx, state)
+
+	// ecs-fallback disabled means no metadata enrichment when ECS is unavailable.
+	if fn := metadata.ValueFunc(ctx, "geoip/city/name"); fn != nil {
+		t.Fatalf("expected city metadata to be unset when fallback policy is disabled")
 	}
 }
 

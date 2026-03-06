@@ -27,29 +27,57 @@ func setup(c *caddy.Controller) error {
 func geoipParse(c *caddy.Controller) (*GeoIP, error) {
 	var dbPath string
 	var edns0 bool
+	fallbackPolicy := ECSFallbackPolicyResolverIP
+	goedgeCity := false
 
 	for c.Next() {
-		if !c.NextArg() {
+		args := c.RemainingArgs()
+		if len(args) > 1 {
 			return nil, c.ArgErr()
 		}
-		if dbPath != "" {
+		if len(args) == 1 {
+			if dbPath != "" {
+				return nil, c.Errf("configuring multiple databases is not supported")
+			}
+			dbPath = args[0]
+		} else if dbPath != "" {
 			return nil, c.Errf("configuring multiple databases is not supported")
-		}
-		dbPath = c.Val()
-		// There shouldn't be any more arguments.
-		if len(c.RemainingArgs()) != 0 {
-			return nil, c.ArgErr()
 		}
 
 		for c.NextBlock() {
-			if c.Val() != "edns-subnet" {
+			switch c.Val() {
+			case "edns-subnet":
+				if len(c.RemainingArgs()) != 0 {
+					return nil, c.ArgErr()
+				}
+				edns0 = true
+			case "ecs-fallback":
+				args := c.RemainingArgs()
+				if len(args) != 1 {
+					return nil, c.ArgErr()
+				}
+				switch ECSFallbackPolicy(args[0]) {
+				case ECSFallbackPolicyResolverIP, ECSFallbackPolicyDisabled:
+					fallbackPolicy = ECSFallbackPolicy(args[0])
+				default:
+					return nil, c.Errf("unknown ecs-fallback policy %q", args[0])
+				}
+			case "goedge-city":
+				if len(c.RemainingArgs()) != 0 {
+					return nil, c.ArgErr()
+				}
+				goedgeCity = true
+			default:
 				return nil, c.Errf("unknown property %q", c.Val())
 			}
-			edns0 = true
 		}
 	}
 
-	geoIP, err := newGeoIP(dbPath, edns0)
+	if dbPath == "" && !goedgeCity {
+		return nil, c.ArgErr()
+	}
+
+	geoIP, err := newGeoIP(dbPath, edns0, fallbackPolicy, goedgeCity)
 	if err != nil {
 		return geoIP, c.Err(err.Error())
 	}

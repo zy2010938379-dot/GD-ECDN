@@ -47,7 +47,6 @@ import (
 	_ "github.com/coredns/coredns/plugin/nomad"
 	_ "github.com/coredns/coredns/plugin/nsid"
 	_ "github.com/coredns/coredns/plugin/pprof"
-	_ "github.com/coredns/coredns/plugin/proxyproto"
 	_ "github.com/coredns/coredns/plugin/quic"
 	_ "github.com/coredns/coredns/plugin/ready"
 	_ "github.com/coredns/coredns/plugin/reload"
