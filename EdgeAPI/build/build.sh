@@ -7,7 +7,7 @@ function build() {
 	OS=${1}
 	ARCH=${2}
 	TAG=${3}
-	NODE_ARCHITECTS=("amd64")
+	NODE_ARCHITECTS=("amd64" "arm64")
 
 	if [ -z "$OS" ]; then
 		echo "usage: build.sh OS ARCH"
