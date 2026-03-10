@@ -305,6 +305,8 @@ func (a *API) addRecordToZone(zone, name, recordType, value string, ttl int) err
 		ttl = 3600
 	}
 
+	recordType = strings.ToUpper(recordType)
+
 	// Read existing content
 	content, err := os.ReadFile(a.ZoneFile)
 	if err != nil && !os.IsNotExist(err) {
@@ -337,31 +339,28 @@ $TTL 3600
 	// Add record
 	recordLine := fmt.Sprintf("%s\t%d\tIN\t%s\t%s\n", name, ttl, recordType, value)
 
-	// Insert record in the correct zone
-	zoneStart := strings.Index(zoneContent, "$ORIGIN "+zone+".")
-	if zoneStart == -1 {
-		// Should not happen since we just added the zone
+	zoneStart, zoneEnd, found := findZoneBounds(zoneContent, zone)
+	if !found {
 		zoneContent += recordLine
 	} else {
-		// Find the end of this zone (next $ORIGIN or end of file)
-		remaining := zoneContent[zoneStart:]
-		nextOrigin := strings.Index(remaining, "\n$ORIGIN ")
+		zoneSection := zoneContent[zoneStart:zoneEnd]
 
-		var insertionPoint int
-		if nextOrigin == -1 {
-			// No next zone, insert at the end
-			insertionPoint = len(zoneContent)
+		// Keep CNAME unique per owner name within the current zone.
+		if recordType == "CNAME" {
+			zoneSection = removeZoneRecords(zoneSection, name, recordType, "")
 		} else {
-			// Insert before next zone
-			insertionPoint = zoneStart + nextOrigin
+			zoneSection = removeZoneRecords(zoneSection, name, recordType, value)
 		}
 
-		// Insert the record at the end of the current zone
-		zoneContent = zoneContent[:insertionPoint] + recordLine + zoneContent[insertionPoint:]
+		if zoneSection != "" && !strings.HasSuffix(zoneSection, "\n") {
+			zoneSection += "\n"
+		}
+		zoneSection += recordLine
+		zoneContent = zoneContent[:zoneStart] + zoneSection + zoneContent[zoneEnd:]
 	}
 
 	// Write back to file
-	return os.WriteFile(a.ZoneFile, []byte(zoneContent), 0644)
+	return os.WriteFile(a.ZoneFile, []byte(cleanZoneContent(zoneContent)), 0644)
 }
 
 // setup function initializes the plugin
@@ -414,6 +413,8 @@ func setup(c *caddy.Controller) error {
 
 // deleteRecordFromZone deletes a record from the zone file by name and type
 func (a *API) deleteRecordFromZone(zone, name, recordType string) error {
+	recordType = strings.ToUpper(recordType)
+
 	// Read existing content
 	content, err := os.ReadFile(a.ZoneFile)
 	if err != nil && !os.IsNotExist(err) {
@@ -422,17 +423,56 @@ func (a *API) deleteRecordFromZone(zone, name, recordType string) error {
 
 	zoneContent := string(content)
 
-	// Build pattern to match the record line
-	pattern := fmt.Sprintf(`(?m)^%s\s+\d+\s+IN\s+%s\s+.*$`, regexp.QuoteMeta(name), regexp.QuoteMeta(recordType))
-	re := regexp.MustCompile(pattern)
+	zoneStart, zoneEnd, found := findZoneBounds(zoneContent, zone)
+	if !found {
+		return nil
+	}
 
-	// Remove the matching record
-	zoneContent = re.ReplaceAllString(zoneContent, "")
-
-	// Clean up empty lines
-	zoneContent = strings.ReplaceAll(zoneContent, "\n\n\n", "\n\n")
-	zoneContent = strings.TrimSpace(zoneContent) + "\n"
+	zoneSection := zoneContent[zoneStart:zoneEnd]
+	zoneSection = removeZoneRecords(zoneSection, name, recordType, "")
+	zoneContent = zoneContent[:zoneStart] + zoneSection + zoneContent[zoneEnd:]
 
 	// Write back to file
-	return os.WriteFile(a.ZoneFile, []byte(zoneContent), 0644)
+	return os.WriteFile(a.ZoneFile, []byte(cleanZoneContent(zoneContent)), 0644)
+}
+
+func findZoneBounds(content, zone string) (start, end int, found bool) {
+	zoneMarker := "$ORIGIN " + zone + "."
+	start = strings.Index(content, zoneMarker)
+	if start == -1 {
+		return 0, 0, false
+	}
+
+	remaining := content[start:]
+	nextOrigin := strings.Index(remaining, "\n$ORIGIN ")
+	if nextOrigin == -1 {
+		return start, len(content), true
+	}
+
+	return start, start + nextOrigin + 1, true
+}
+
+func removeZoneRecords(zoneSection, name, recordType, value string) string {
+	pattern := fmt.Sprintf(`(?m)^%s\s+\d+\s+IN\s+%s\s+`, regexp.QuoteMeta(name), regexp.QuoteMeta(recordType))
+	if value != "" {
+		pattern += regexp.QuoteMeta(value) + `\s*(?:\n|$)`
+	} else {
+		pattern += `.*(?:\n|$)`
+	}
+
+	re := regexp.MustCompile(pattern)
+	return re.ReplaceAllString(zoneSection, "")
+}
+
+func cleanZoneContent(content string) string {
+	for strings.Contains(content, "\n\n\n") {
+		content = strings.ReplaceAll(content, "\n\n\n", "\n\n")
+	}
+
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+
+	return content + "\n"
 }
