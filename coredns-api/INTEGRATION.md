@@ -61,6 +61,8 @@ go generate && go build -o ../build/coredns-with-api
     api {
         address :8080
         zone_file ./zones.db
+        # 可选：ECS 扩展日志开关，默认 off
+        # ecs_log on
     }
     
     file ./zones.db
@@ -94,6 +96,8 @@ api {
     address :8080
     apikey "your-secret-key"
     zone_file ./zones.db
+    # 可选：ECS 扩展日志开关，默认 off
+    # ecs_log on
 }
 ```
 

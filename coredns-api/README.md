@@ -106,6 +106,8 @@ Add the following to your Corefile:
         # Optional: enable authentication
         # apikey "your-secret-key"
         zone_file /etc/coredns/zones.db
+        # Optional: ECS extension logging switch, default off
+        # ecs_log on
     }
 
     # File-based zone storage

@@ -1,6 +1,9 @@
 package geoip
 
 import (
+	"strings"
+	"time"
+
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
@@ -29,6 +32,7 @@ func geoipParse(c *caddy.Controller) (*GeoIP, error) {
 	var edns0 bool
 	fallbackPolicy := ECSFallbackPolicyResolverIP
 	goedgeCity := false
+	goedgeCityMySQL := GoEdgeCityMySQLConfig{}
 
 	for c.Next() {
 		args := c.RemainingArgs()
@@ -67,6 +71,44 @@ func geoipParse(c *caddy.Controller) (*GeoIP, error) {
 					return nil, c.ArgErr()
 				}
 				goedgeCity = true
+			case "goedge-city-mysql-dsn":
+				args := c.RemainingArgs()
+				if len(args) != 1 {
+					return nil, c.ArgErr()
+				}
+				goedgeCityMySQL.DSN = args[0]
+			case "goedge-city-mysql-table":
+				args := c.RemainingArgs()
+				if len(args) != 1 {
+					return nil, c.ArgErr()
+				}
+				goedgeCityMySQL.Table = args[0]
+			case "goedge-city-mysql-query":
+				args := c.RemainingArgs()
+				if len(args) != 1 {
+					return nil, c.ArgErr()
+				}
+				goedgeCityMySQL.Query = args[0]
+			case "goedge-city-mysql-refresh":
+				args := c.RemainingArgs()
+				if len(args) != 1 {
+					return nil, c.ArgErr()
+				}
+				dur, err := time.ParseDuration(args[0])
+				if err != nil {
+					return nil, c.Errf("invalid goedge-city-mysql-refresh value %q: %v", args[0], err)
+				}
+				goedgeCityMySQL.RefreshInterval = dur
+			case "goedge-city-mysql-timeout":
+				args := c.RemainingArgs()
+				if len(args) != 1 {
+					return nil, c.ArgErr()
+				}
+				dur, err := time.ParseDuration(args[0])
+				if err != nil {
+					return nil, c.Errf("invalid goedge-city-mysql-timeout value %q: %v", args[0], err)
+				}
+				goedgeCityMySQL.QueryTimeout = dur
 			default:
 				return nil, c.Errf("unknown property %q", c.Val())
 			}
@@ -77,7 +119,14 @@ func geoipParse(c *caddy.Controller) (*GeoIP, error) {
 		return nil, c.ArgErr()
 	}
 
-	geoIP, err := newGeoIP(dbPath, edns0, fallbackPolicy, goedgeCity)
+	if goedgeCityMySQL.Enabled() && !goedgeCity {
+		return nil, c.Errf("goedge-city-mysql-* requires goedge-city to be enabled")
+	}
+	if !goedgeCityMySQL.Enabled() && (strings.TrimSpace(goedgeCityMySQL.Table) != "" || strings.TrimSpace(goedgeCityMySQL.Query) != "" || goedgeCityMySQL.RefreshInterval > 0 || goedgeCityMySQL.QueryTimeout > 0) {
+		return nil, c.Errf("goedge-city-mysql-dsn is required when mysql options are set")
+	}
+
+	geoIP, err := newGeoIPWithMySQLConfig(dbPath, edns0, fallbackPolicy, goedgeCity, goedgeCityMySQL)
 	if err != nil {
 		return geoIP, c.Err(err.Error())
 	}

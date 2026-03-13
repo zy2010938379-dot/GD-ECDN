@@ -71,6 +71,9 @@ func TestGeoIPParse(t *testing.T) {
 		{true, fmt.Sprintf("%s /invalidPath\n", pluginName), "failed to open database file: open /invalidPath: no such file or directory", 0, false},
 		{true, fmt.Sprintf("%s %s\n", pluginName, unknownDBPath), "reader does not support the \"UnknownDbType\" database type", 0, false},
 		{true, fmt.Sprintf("%s %s {\n\tecs-fallback nope\n}", pluginName, cityDBPath), "unknown ecs-fallback policy", 0, false},
+		{true, fmt.Sprintf("%s {\n\tgoedge-city-mysql-table city_map\n\tgoedge-city\n}\n", pluginName), "goedge-city-mysql-dsn is required", 0, false},
+		{true, fmt.Sprintf("%s %s {\n\tgoedge-city-mysql-dsn user:pass@tcp(127.0.0.1:3306)/geo\n}\n", pluginName, cityDBPath), "requires goedge-city", 0, false},
+		{true, fmt.Sprintf("%s {\n\tgoedge-city\n\tgoedge-city-mysql-refresh abc\n}\n", pluginName), "invalid goedge-city-mysql-refresh value", 0, false},
 	}
 
 	for i, test := range tests {

@@ -40,6 +40,7 @@ var Directives = []string{
 	"chaos",
 	"loadbalance",
 	"tsig",
+	"api",
 	"cache",
 	"rewrite",
 	"acl",
@@ -68,5 +69,4 @@ var Directives = []string{
 	"sign",
 	"view",
 	"nomad",
-	"api",
 }

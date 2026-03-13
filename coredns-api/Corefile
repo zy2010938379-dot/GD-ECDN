@@ -1,19 +1,27 @@
 .:8053 {
-    # CoreDNS plugins
-    errors
-    health
+      errors
+      log
+      metadata
 
-    # Enable API plugin
-    api {
-        address :18080
-        # Optional: enable authentication
-        # apikey "your-secret-key"
-        zone_file ./zones.db
-    }
+      geoip {
+          edns-subnet
+          ecs-fallback resolver-ip
+          goedge-city
+          goedge-city-mysql-dsn "root:123456@tcp(127.0.0.1:3306)/db_dns"
+          goedge-city-mysql-table edns_city_mapping
+      }
 
-    # File-based zone storage
-    file ./zones.db
+      api {
+          address :18080
+          zone_file ./zones.db
+          ecs_log on
 
-    cache
-    forward . 8.8.8.8 1.1.1.1
-}
+          goedge-city-node-routing on
+          goedge-city-node-routing-mysql-dsn "root:123456@tcp(127.0.0.1:3306)/db_edge"
+          goedge-city-node-routing-cluster-id 1
+          goedge-city-node-routing-fqdn g5583bf.cdn.example.com.
+      }
+
+      file ./zones.db
+      forward . 223.5.5.5
+  }

@@ -27,6 +27,7 @@ type GeoIP struct {
 	edns0             bool
 	ecsFallbackPolicy ECSFallbackPolicy
 	goedgeCity        bool
+	goedgeCityMySQL   *goedgeCityMySQLStore
 }
 
 type db struct {
@@ -49,6 +50,10 @@ var (
 )
 
 func newGeoIP(dbPath string, edns0 bool, fallbackPolicy ECSFallbackPolicy, goedgeCity bool) (*GeoIP, error) {
+	return newGeoIPWithMySQLConfig(dbPath, edns0, fallbackPolicy, goedgeCity, GoEdgeCityMySQLConfig{})
+}
+
+func newGeoIPWithMySQLConfig(dbPath string, edns0 bool, fallbackPolicy ECSFallbackPolicy, goedgeCity bool, mysqlCfg GoEdgeCityMySQLConfig) (*GeoIP, error) {
 	db := db{}
 	if dbPath != "" {
 		reader, err := geoip2.Open(dbPath)
@@ -90,11 +95,21 @@ func newGeoIP(dbPath string, edns0 bool, fallbackPolicy ECSFallbackPolicy, goedg
 		}
 	}
 
+	var cityStore *goedgeCityMySQLStore
+	if mysqlCfg.Enabled() {
+		store, err := newGoEdgeCityMySQLStore(mysqlCfg)
+		if err != nil {
+			return nil, err
+		}
+		cityStore = store
+	}
+
 	return &GeoIP{
 		db:                db,
 		edns0:             edns0,
 		ecsFallbackPolicy: fallbackPolicy,
 		goedgeCity:        goedgeCity,
+		goedgeCityMySQL:   cityStore,
 	}, nil
 }
 

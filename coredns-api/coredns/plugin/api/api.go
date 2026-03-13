@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -25,22 +27,192 @@ type API struct {
 	Next plugin.Handler
 
 	// Configuration
-	Address  string `json:"address,omitempty"`
-	APIKey   string `json:"apikey,omitempty"`
-	ZoneFile string `json:"zone_file,omitempty"`
+	Address         string                      `json:"address,omitempty"`
+	APIKey          string                      `json:"apikey,omitempty"`
+	ZoneFile        string                      `json:"zone_file,omitempty"`
+	ECSLog          bool                        `json:"ecs_log,omitempty"`
+	CityNodeRouting GoEdgeCityNodeRoutingConfig `json:"city_node_routing,omitempty"`
 
 	// Internal state
-	mu         sync.RWMutex
-	httpServer *http.Server
+	mu             sync.RWMutex
+	httpServer     *http.Server
+	cityNodeRouter *goedgeCityNodeRouter
+}
+
+type ecsLoggingResponseWriter struct {
+	dns.ResponseWriter
+	req        *dns.Msg
+	remoteAddr net.Addr
+}
+
+func (w *ecsLoggingResponseWriter) WriteMsg(res *dns.Msg) error {
+	logECSResponse(w.req, res, w.remoteAddr)
+	return w.ResponseWriter.WriteMsg(res)
+}
+
+func (w *ecsLoggingResponseWriter) Write(buf []byte) (int, error) {
+	if len(buf) > 0 {
+		msg := new(dns.Msg)
+		if err := msg.Unpack(buf); err == nil {
+			logECSResponse(w.req, msg, w.remoteAddr)
+		}
+	}
+	return w.ResponseWriter.Write(buf)
 }
 
 // ServeDNS implements the plugin.Handler interface
 func (a *API) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	return plugin.NextOrFailure(a.Name(), a.Next, ctx, w, r)
+	writer := w
+	if a.ECSLog {
+		remoteAddr := w.RemoteAddr()
+		logECSRequest(r, remoteAddr)
+		writer = &ecsLoggingResponseWriter{
+			ResponseWriter: w,
+			req:            r,
+			remoteAddr:     remoteAddr,
+		}
+	}
+
+	if handled, rcode, err := a.serveCityNodeRoute(ctx, writer, r); handled {
+		return rcode, err
+	}
+
+	return plugin.NextOrFailure(a.Name(), a.Next, ctx, writer, r)
 }
 
 // Name implements the plugin.Handler interface
 func (a *API) Name() string { return "api" }
+
+func logECSRequest(msg *dns.Msg, remoteAddr net.Addr) {
+	subnet := ecsSubnetFromMsg(msg)
+	if subnet == nil {
+		return
+	}
+
+	log.Printf("[api] ecs request qname=%s resolver=%s %s", questionName(msg), remoteAddrString(remoteAddr), ecsDetails(subnet))
+}
+
+func logECSResponse(req, res *dns.Msg, remoteAddr net.Addr) {
+	reqSubnet := ecsSubnetFromMsg(req)
+	resSubnet := ecsSubnetFromMsg(res)
+	if reqSubnet == nil && resSubnet == nil {
+		return
+	}
+
+	rcode := dns.RcodeSuccess
+	if res != nil {
+		rcode = res.Rcode
+	}
+
+	if resSubnet == nil {
+		log.Printf("[api] ecs response qname=%s resolver=%s rcode=%s option=absent", questionName(req), remoteAddrString(remoteAddr), rcodeToString(rcode))
+		return
+	}
+
+	log.Printf("[api] ecs response qname=%s resolver=%s rcode=%s %s", questionName(req), remoteAddrString(remoteAddr), rcodeToString(rcode), ecsDetails(resSubnet))
+}
+
+func ecsSubnetFromMsg(msg *dns.Msg) *dns.EDNS0_SUBNET {
+	if msg == nil {
+		return nil
+	}
+
+	opt := msg.IsEdns0()
+	if opt == nil {
+		return nil
+	}
+
+	for _, option := range opt.Option {
+		if subnet, ok := option.(*dns.EDNS0_SUBNET); ok {
+			return subnet
+		}
+	}
+
+	return nil
+}
+
+func ecsDetails(subnet *dns.EDNS0_SUBNET) string {
+	if subnet == nil {
+		return ""
+	}
+
+	address := "<nil>"
+	if subnet.Address != nil {
+		address = subnet.Address.String()
+	}
+
+	return fmt.Sprintf(
+		"type=%d option_code=%d option_length=%d family=%d source_prefix=%d scope_prefix=%d address=%s",
+		dns.TypeOPT,
+		subnet.Option(),
+		ecsOptionLength(subnet),
+		subnet.Family,
+		subnet.SourceNetmask,
+		subnet.SourceScope,
+		address,
+	)
+}
+
+func ecsOptionLength(subnet *dns.EDNS0_SUBNET) int {
+	if subnet == nil {
+		return 0
+	}
+
+	maxPrefixBits := 128
+	switch subnet.Family {
+	case 1:
+		maxPrefixBits = 32
+	case 2:
+		maxPrefixBits = 128
+	default:
+		if subnet.Address != nil && subnet.Address.To4() != nil {
+			maxPrefixBits = 32
+		}
+	}
+
+	prefixBits := int(subnet.SourceNetmask)
+	if prefixBits > maxPrefixBits {
+		prefixBits = maxPrefixBits
+	}
+	if prefixBits < 0 {
+		prefixBits = 0
+	}
+
+	// RFC 7871 section 6: FAMILY(2) + SOURCE PREFIX-LENGTH(1) + SCOPE PREFIX-LENGTH(1) + ADDRESS(n)
+	return 4 + (prefixBits+7)/8
+}
+
+func questionName(msg *dns.Msg) string {
+	if msg == nil || len(msg.Question) == 0 {
+		return "."
+	}
+	return msg.Question[0].Name
+}
+
+func remoteAddrString(addr net.Addr) string {
+	if addr == nil {
+		return "unknown"
+	}
+	return addr.String()
+}
+
+func rcodeToString(rcode int) string {
+	if s, ok := dns.RcodeToString[rcode]; ok {
+		return s
+	}
+	return strconv.Itoa(rcode)
+}
+
+func parseBoolOption(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "t", "true", "on", "yes":
+		return true, nil
+	case "0", "f", "false", "off", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value %q", value)
+	}
+}
 
 // startHTTPServer starts the HTTP API server
 func (a *API) startHTTPServer() error {
@@ -386,6 +558,76 @@ func setup(c *caddy.Controller) error {
 					return c.ArgErr()
 				}
 				api.ZoneFile = c.Val()
+			case "ecs_log":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				enabled, err := parseBoolOption(c.Val())
+				if err != nil {
+					return c.Errf("ecs_log expects on/off (or true/false), got %q", c.Val())
+				}
+				api.ECSLog = enabled
+			case "goedge-city-node-routing":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				enabled, err := parseBoolOption(c.Val())
+				if err != nil {
+					return c.Errf("goedge-city-node-routing expects on/off (or true/false), got %q", c.Val())
+				}
+				api.CityNodeRouting.Enabled = enabled
+			case "goedge-city-node-routing-mysql-dsn":
+				args := c.RemainingArgs()
+				if len(args) == 0 {
+					return c.ArgErr()
+				}
+				api.CityNodeRouting.MySQLDSN = strings.Join(args, "")
+			case "goedge-city-node-routing-cluster-id":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				clusterID, err := strconv.ParseInt(c.Val(), 10, 64)
+				if err != nil || clusterID <= 0 {
+					return c.Errf("goedge-city-node-routing-cluster-id expects positive integer, got %q", c.Val())
+				}
+				api.CityNodeRouting.ClusterID = clusterID
+			case "goedge-city-node-routing-refresh":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				dur, err := time.ParseDuration(c.Val())
+				if err != nil || dur <= 0 {
+					return c.Errf("invalid goedge-city-node-routing-refresh value %q", c.Val())
+				}
+				api.CityNodeRouting.RefreshInterval = dur
+			case "goedge-city-node-routing-timeout":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				dur, err := time.ParseDuration(c.Val())
+				if err != nil || dur <= 0 {
+					return c.Errf("invalid goedge-city-node-routing-timeout value %q", c.Val())
+				}
+				api.CityNodeRouting.QueryTimeout = dur
+			case "goedge-city-node-routing-ttl":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				ttl, err := strconv.ParseUint(c.Val(), 10, 32)
+				if err != nil {
+					return c.Errf("invalid goedge-city-node-routing-ttl value %q", c.Val())
+				}
+				api.CityNodeRouting.TTL = uint32(ttl)
+			case "goedge-city-node-routing-fqdn":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				api.CityNodeRouting.FQDN = c.Val()
+			case "goedge-city-node-routing-role":
+				if !c.NextArg() {
+					return c.ArgErr()
+				}
+				api.CityNodeRouting.NodeRole = c.Val()
 			default:
 				return c.Errf("unknown property '%s'", c.Val())
 			}
@@ -395,6 +637,14 @@ func setup(c *caddy.Controller) error {
 	// Set default address if not specified
 	if api.Address == "" {
 		api.Address = ":8080"
+	}
+
+	if api.CityNodeRouting.Enabled {
+		router, err := newGoedgeCityNodeRouter(api.CityNodeRouting)
+		if err != nil {
+			return err
+		}
+		api.cityNodeRouter = router
 	}
 
 	// Start HTTP server

@@ -11,7 +11,6 @@ $TTL 3600
                         3600       ; minimum
                         )
 
-
 ns1     IN      A       192.168.1.10
 ns2     IN      A       192.168.1.11
 
@@ -51,25 +50,14 @@ g47d8fd.cdn	3600	IN	A	127.0.0.1
 g47d8fd.cdn	3600	IN	A	127.0.0.1
 1114f8ba	3600	IN	CNAME	g47d8fd.cdn.example.com.
 test1	3600	IN	CNAME	g47d8fd.cdn.example.com.
-test	3600	IN	CNAME	g47d8fd.cdn.example.com.
 g47d8fd.cdn	3600	IN	A	127.0.0.1
 g47d8fd.cdn	3600	IN	A	127.0.0.1
 g47d8fd.cdn	3600	IN	A	127.0.0.1
-node1.cdn	3600	IN	A	127.0.0.1
-test	3600	IN	CNAME	node1.cdn.example.com.
-node1.cdn	3600	IN	A	127.0.0.1
-node1.cdn	3600	IN	A	127.0.0.1
-node1.cdn	3600	IN	A	127.0.0.1
+test	3600	IN	CNAME	g5583bf.cdn.example.com.
 node1.cdn	3600	IN	A	192.168.49.101
 node1.cdn	3600	IN	A	127.0.0.1
-node1.cdn	3600	IN	A	192.168.49.101
-node1.cdn	3600	IN	A	127.0.0.1
-test	3600	IN	CNAME	node1.cdn.example.com.
-node1.cdn	3600	IN	A	192.168.49.101
-node1.cdn	3600	IN	A	127.0.0.1
-node1.cdn	3600	IN	A	192.168.49.101
-node1.cdn	3600	IN	A	127.0.0.1
-
+g5583bf.cdn	3600	IN	A	127.0.0.1
+g5583bf.cdn	3600	IN	A	192.168.201.210
 $ORIGIN test.org.
 $TTL 3600
 
@@ -94,7 +82,6 @@ $TTL 3600
                         1800       ; retry
                         604800     ; expire
                         86400 )    ; minimum
-
 
 @	3600	IN	A	192.168.3.100
 @	3600	IN	A	192.168.3.100

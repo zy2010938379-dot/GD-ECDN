@@ -1,10 +1,13 @@
 package api
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miekg/dns"
 )
 
 func TestAddRecordToZoneReplacesExistingCNAMEWithSameName(t *testing.T) {
@@ -113,3 +116,114 @@ func readZoneFile(t *testing.T, filename string) string {
 	}
 	return string(content)
 }
+
+func TestECSSubnetFromMsg(t *testing.T) {
+	t.Parallel()
+
+	msg := new(dns.Msg)
+	msg.SetQuestion("edge.example.", dns.TypeA)
+	msg.SetEdns0(1232, false)
+	opt := msg.IsEdns0()
+	opt.Option = append(opt.Option, &dns.EDNS0_SUBNET{
+		Code:          dns.EDNS0SUBNET,
+		Family:        1,
+		SourceNetmask: 24,
+		SourceScope:   16,
+		Address:       net.ParseIP("61.142.56.193").To4(),
+	})
+
+	subnet := ecsSubnetFromMsg(msg)
+	if subnet == nil {
+		t.Fatalf("expected ECS subnet to be extracted")
+	}
+	if subnet.Family != 1 || subnet.SourceNetmask != 24 || subnet.SourceScope != 16 {
+		t.Fatalf("unexpected ECS fields: family=%d source=%d scope=%d", subnet.Family, subnet.SourceNetmask, subnet.SourceScope)
+	}
+}
+
+func TestECSDetailsIncludesExpectedFields(t *testing.T) {
+	t.Parallel()
+
+	subnet := &dns.EDNS0_SUBNET{
+		Code:          dns.EDNS0SUBNET,
+		Family:        1,
+		SourceNetmask: 32,
+		SourceScope:   24,
+		Address:       net.ParseIP("61.142.56.193").To4(),
+	}
+
+	details := ecsDetails(subnet)
+	expectedParts := []string{
+		"type=41",
+		"option_code=8",
+		"option_length=8",
+		"family=1",
+		"source_prefix=32",
+		"scope_prefix=24",
+		"address=61.142.56.193",
+	}
+	for _, part := range expectedParts {
+		if !strings.Contains(details, part) {
+			t.Fatalf("details should contain %q, got: %s", part, details)
+		}
+	}
+}
+
+func TestECSOptionLengthClamp(t *testing.T) {
+	t.Parallel()
+
+	ipv4TooLong := &dns.EDNS0_SUBNET{
+		Family:        1,
+		SourceNetmask: 40,
+		Address:       net.ParseIP("61.142.56.193").To4(),
+	}
+	if got := ecsOptionLength(ipv4TooLong); got != 8 {
+		t.Fatalf("expected ipv4 option length 8, got %d", got)
+	}
+
+	ipv6 := &dns.EDNS0_SUBNET{
+		Family:        2,
+		SourceNetmask: 56,
+		Address:       net.ParseIP("2001:db8::1"),
+	}
+	if got := ecsOptionLength(ipv6); got != 11 {
+		t.Fatalf("expected ipv6 option length 11, got %d", got)
+	}
+}
+
+func TestParseBoolOption(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		value string
+		want  bool
+		ok    bool
+	}{
+		{value: "on", want: true, ok: true},
+		{value: "off", want: false, ok: true},
+		{value: "true", want: true, ok: true},
+		{value: "false", want: false, ok: true},
+		{value: "1", want: true, ok: true},
+		{value: "0", want: false, ok: true},
+		{value: "YES", want: true, ok: true},
+		{value: "No", want: false, ok: true},
+		{value: "maybe", ok: false},
+	}
+
+	for _, tc := range cases {
+		got, err := parseBoolOption(tc.value)
+		if tc.ok && err != nil {
+			t.Fatalf("value %q should parse, got err=%v", tc.value, err)
+		}
+		if !tc.ok && err == nil {
+			t.Fatalf("value %q should fail parsing", tc.value)
+		}
+		if tc.ok && got != tc.want {
+			t.Fatalf("value %q parsed as %v, want %v", tc.value, got, tc.want)
+		}
+	}
+}
+/*
+test_esc_log:
+dig @127.0.0.1 -p 8053 www.example.com A +subnet=61.142.56.193/32 +noall +answer
+*/
